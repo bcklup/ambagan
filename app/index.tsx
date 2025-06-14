@@ -1,34 +1,43 @@
-import { ScrollView, StyleSheet, View } from "react-native";
+import { supabase } from "@/lib/supabase";
+import { Session } from "@supabase/supabase-js";
+import { Redirect } from "expo-router";
+import { useEffect, useState } from "react";
+import { Text, View } from "react-native";
 
-import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
-import { Colors } from "@/constants/Colors";
-import { useThemeColor } from "@/hooks/useThemeColor";
+export default function IndexScreen() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-export default function HomeScreen() {
-  const color = useThemeColor({ light: "#", dark: Colors.dark.tint }, "text");
-  return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <ThemedText type="title" darkColor={color} lightColor={color}>
-        Ambagan
-      </ThemedText>
-      <ThemedView>
-        <View style={styles.card}>
-          <ThemedText type="defaultSemiBold">Bowling</ThemedText>
-        </View>
-      </ThemedView>
-    </ScrollView>
-  );
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setIsLoading(false);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
+
+  // Redirect based on authentication state
+  if (session && session.user) {
+    return <Redirect href="/(tabs)" />;
+  }
+
+  return <Redirect href="/auth/login" />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    marginTop: 32,
-  },
-  card: {
-    padding: 16,
-    borderRadius: 16,
-  },
-});
