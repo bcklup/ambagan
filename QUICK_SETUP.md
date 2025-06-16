@@ -1,8 +1,8 @@
 # 🚀 Quick Setup Guide
 
-## Problem: "Continue with Google" Not Working
+## Phone Number + OTP Authentication 📱
 
-The app needs Supabase configuration to enable authentication. Here's how to fix it:
+Simple, fast, and perfect for bill-splitting apps! Now with international support, defaulting to Philippines 🇵🇭
 
 ## Step 1: Create Supabase Project
 
@@ -35,81 +35,142 @@ Replace the values with your actual credentials from Step 2.
 2. Copy the contents of `supabase_schema.sql`
 3. Paste and run it
 
-## Step 5: Enable Google OAuth
+## Step 5: Enable Phone Authentication
 
-1. In Supabase, go to **Authentication** → **Providers**
-2. Find **Google** and toggle it on
-3. You'll need Google OAuth credentials:
+### Enable Phone Auth in Supabase:
 
-### Google Setup (Fixed for Expo Go):
+1. In Supabase, go to **Authentication** → **Settings**
+2. Scroll down to **Phone Auth**
+3. Toggle **Enable phone confirmations** to ON
+4. Choose an SMS provider (see next step)
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project or select existing
-3. Enable **Google+ API** (or **Google Identity API**)
-4. Go to **Credentials** → **Create Credentials** → **OAuth 2.0 Client ID**
-5. **Important**: Choose **Web application** (not mobile)
-6. Add **both** redirect URIs:
-   ```
-   https://your-project-ref.supabase.co/auth/v1/callback
-   https://auth.expo.io/@your-username/ambagan
-   ```
-   - Replace `your-project-ref` with your Supabase project reference
-   - Replace `your-username` with your Expo username (check your Expo account)
-7. Copy **Client ID** and **Client Secret**
-8. Paste them in Supabase Google provider settings
+### Configure SMS Provider:
 
-### Supabase OAuth Settings:
+**For Development/Testing** - Use Supabase's test provider:
 
-In your Supabase **Authentication** → **URL Configuration**:
+1. In **Authentication** → **Settings** → **SMS Provider**
+2. Select **Supabase Test Provider** (free for testing)
+3. **Note**: Test provider only works with specific test numbers
 
-- **Site URL**: `https://auth.expo.io/@your-username/ambagan`
-- **Redirect URLs**: Add this line:
-  ```
-  https://auth.expo.io/@your-username/ambagan
-  ```
+**For Production** - Set up Twilio (recommended):
 
-## Step 6: Find Your Expo Username
+1. Create account at [twilio.com](https://twilio.com)
+2. Get your **Account SID** and **Auth Token**
+3. Buy a phone number ($1/month)
+4. In Supabase, select **Twilio** as SMS provider
+5. Enter your credentials
+6. **Cost**: ~$0.0075 per SMS
 
-Run this command to see your Expo username:
+## Step 6: Test the App!
 
-```bash
-npx expo whoami
-```
+1. Try the app - you should see a clean phone number form with country selector
+2. **Default is set to Philippines 🇵🇭** (+63)
+3. **Tap the country selector** to change to any other country
+4. **Enter your phone number** (with your real number for testing)
+5. **Tap "Send Verification Code"**
+6. **Check your phone** for SMS (should arrive in seconds)
+7. **Enter the 6-digit code**
+8. **Verify & Sign In** - you should be logged into the app! 🎉
 
-Or check your Expo account at [expo.dev](https://expo.dev)
+## How This Works:
 
-## Step 7: Test
+✅ **Super simple**: Just phone number → OTP → logged in  
+✅ **No passwords**: Nothing to remember or forget  
+✅ **Mobile-first**: Perfect for a social bill-splitting app  
+✅ **International support**: Works with any country 🌍  
+✅ **Smart formatting**: Phone numbers format per country  
+✅ **Philippines default**: Perfect for local users 🇵🇭
 
-1. Try "Continue with Google" again
-2. Check console logs for "Generated redirect URI" to see the exact URI being used
-3. Make sure that URI is added to your Google OAuth settings
-4. Should now work! 🎉
+## Features:
 
-## How This Works Now:
+### International Support:
 
-✅ **Expo Go compatible**: Uses Expo's auth proxy service  
-✅ **Proper redirect handling**: Redirects back to your app correctly  
-✅ **Token parsing**: Extracts auth tokens from the callback URL  
-✅ **Automatic session**: Sets up Supabase session automatically
+- 🌍 **195+ countries** - Full international support
+- 🇵🇭 **Philippines default** - Starts with +63 country code
+- 🎨 **Country picker** - Beautiful flag selector with search
+- 📱 **Smart formatting** - Numbers format per country (PH: 917 123 4567, US: (555) 123-4567)
+- 🔄 **Auto-detection** - Handles various number formats
+
+### Authentication Features:
+
+- 🔢 **6-digit OTP input** - Large, easy-to-read code entry
+- 📲 **Resend code** - If user doesn't receive SMS
+- ↩️ **Change phone number** - Easy to go back and fix
+- 🏷️ **Optional name** - Personalize the experience
+- 🎨 **Beautiful UI** - Clean, focused interface
 
 ## Troubleshooting
 
-- **"localhost" error**: Make sure you're using the Expo auth proxy URL, not localhost
-- **Redirect URI mismatch**: Check that the logged redirect URI matches what's in Google OAuth
+### Setup Issues:
+
 - **Button does nothing**: Check if `.env` file exists and has correct credentials
-- **OAuth error**: Make sure both redirect URIs are added to Google OAuth settings
+- **"Configuration Error"**: Make sure your Supabase URL and key are correct
+- **Phone auth not enabled**: Make sure you enabled phone confirmations in Supabase
+
+### SMS Issues:
+
+- **Code not received**:
+  - Check if phone number is correct
+  - Try resending the code
+  - Check if SMS provider is configured properly
+  - Make sure country code is correct
+- **Test provider not working**: Test provider only works with specific test numbers
+- **Production SMS issues**: Check Twilio balance and phone number setup
+- **International numbers**: Make sure your SMS provider supports the target country
+
+### Code Issues:
+
+- **"Invalid code"**: Make sure you entered all 6 digits correctly
+- **Code expired**: Request a new code (they expire after 10 minutes)
 - **Database error**: Make sure you ran the SQL schema
-- **Still having issues**: Check console logs for the exact redirect URI being generated
 
-## Quick Test
+## Country-Specific Notes
 
-After setup, the "Continue with Google" button should:
+### Philippines 🇵🇭 (Default):
 
-1. Open Google sign-in in a browser
-2. ✅ **Sign in with your Google account**
-3. ✅ **Redirect to https://auth.expo.io/... URL**
-4. ✅ **Return to Expo Go automatically**
-5. Show "Session established successfully!" in console
-6. Navigate to the main app
+- **Format**: 917 123 4567 or 0917 123 4567
+- **Code**: +63
+- **Mobile prefixes**: 9xx series (Globe, Smart, etc.)
 
-**Key fix**: Using Expo's auth proxy service instead of localhost!
+### United States 🇺🇸:
+
+- **Format**: (555) 123-4567
+- **Code**: +1
+
+### Others:
+
+- **Generic formatting**: 123 456 7890
+- **All country codes supported**
+
+## Cost Breakdown
+
+**Development**: FREE with test provider  
+**Production**: ~$0.01 per user signup + Twilio phone number ($1/month)  
+**International SMS**: Rates vary by country (~$0.01-0.05)
+
+**Much cheaper than email services** and better user experience!
+
+## Quick Test Flow
+
+The app should work like this:
+
+1. 📱 **Phone screen**: Clean form with country selector (🇵🇭 default) + phone number
+2. 🌍 **Country selection**: Tap flag to change country, search supported
+3. ✅ **Auto-formatting**: Phone formats per country as you type
+4. 📲 **Send code**: Tap button → SMS sent in seconds
+5. 🔢 **OTP screen**: Enter 6-digit code with large input
+6. ✅ **Verify**: Automatic login on correct code
+7. 🎯 **Main app**: Seamless redirect to dashboard
+
+**Perfect for bill-splitting apps** - users can easily find friends by phone number! 🚀
+
+## Next Steps
+
+Once phone auth is working:
+
+1. ✅ **Test with different countries** - Try US, PH, and others
+2. 🎯 **Build your main app features**
+3. 👥 **Use phone numbers for friend finding**
+4. 📱 **Add contact sync later** (optional enhancement)
+
+International support makes your app ready for global users! 🌍📱✨

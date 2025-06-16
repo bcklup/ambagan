@@ -141,23 +141,17 @@ CREATE POLICY "Users can manage their own payment methods" ON user_payment_metho
     FOR ALL USING (user_id = auth.uid());
 
 -- Members policies
-CREATE POLICY "Users can view members of sessions they're part of" ON members
+CREATE POLICY "Users can view members of sessions they created or are explicitly part of" ON members
     FOR SELECT USING (
-        session_id IN (
-            SELECT id FROM sessions WHERE 
-            creator_id = auth.uid() OR 
-            id IN (SELECT session_id FROM members WHERE user_id = auth.uid())
-        )
+        user_id = auth.uid() OR
+        added_by_user_id = auth.uid() OR
+        session_id IN (SELECT id FROM sessions WHERE creator_id = auth.uid())
     );
 
-CREATE POLICY "Users can add members to sessions they're part of" ON members
+CREATE POLICY "Users can add members to sessions they created or are part of" ON members
     FOR INSERT WITH CHECK (
         added_by_user_id = auth.uid() AND
-        session_id IN (
-            SELECT id FROM sessions WHERE 
-            creator_id = auth.uid() OR 
-            id IN (SELECT session_id FROM members WHERE user_id = auth.uid())
-        )
+        session_id IN (SELECT id FROM sessions WHERE creator_id = auth.uid())
     );
 
 CREATE POLICY "Users can update members they added or in sessions they created" ON members

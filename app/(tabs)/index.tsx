@@ -1,18 +1,20 @@
 import { supabase } from "@/lib/supabase";
-import { Ionicons } from "@expo/vector-icons";
+import { AppTheme } from "@/lib/theme";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  RefreshControl,
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  Portal,
+  Surface,
   Text,
   TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+  useTheme,
+} from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface Session {
@@ -27,10 +29,11 @@ interface Session {
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const theme = useTheme<AppTheme>();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [createDialogVisible, setCreateDialogVisible] = useState(false);
   const [sessionName, setSessionName] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -43,29 +46,71 @@ export default function DashboardScreen() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
 
-      // Get sessions where user is creator or member
-      const { data: sessionsData, error } = await supabase
+      console.log("Dashboard: Fetching sessions for user:", user?.id);
+
+      if (!user) {
+        console.log("Dashboard: No user found");
+        return;
+      }
+
+      // Get sessions where user is creator
+      const { data: creatorSessions, error: creatorError } = await supabase
         .from("sessions")
         .select(
           `
           id,
           name,
           created_at,
-          creator_id,
-          members!inner(id)
+          creator_id
         `
         )
-        .or(`creator_id.eq.${user.id},members.user_id.eq.${user.id}`)
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
+        .eq("creator_id", user.id)
+        .eq("is_active", true);
 
-      if (error) throw error;
+      if (creatorError) throw creatorError;
+
+      // Get session IDs where user is a member
+      const { data: memberSessionIds, error: memberIdsError } = await supabase
+        .from("members")
+        .select("session_id")
+        .eq("user_id", user.id);
+
+      if (memberIdsError) throw memberIdsError;
+
+      // Get sessions where user is a member (if any)
+      let memberSessions: any[] = [];
+      if (memberSessionIds && memberSessionIds.length > 0) {
+        const sessionIds = memberSessionIds.map((item) => item.session_id);
+        const { data: memberSessionsData, error: memberError } = await supabase
+          .from("sessions")
+          .select(
+            `
+            id,
+            name,
+            created_at,
+            creator_id
+          `
+          )
+          .in("id", sessionIds)
+          .eq("is_active", true);
+
+        if (memberError) throw memberError;
+        memberSessions = memberSessionsData || [];
+      }
+
+      // Combine and deduplicate sessions
+      const allSessions = [...(creatorSessions || []), ...memberSessions];
+      const uniqueSessions = allSessions.filter(
+        (session, index, self) =>
+          index === self.findIndex((s) => s.id === session.id)
+      );
+
+      console.log("Dashboard: Fetched sessions:", uniqueSessions.length);
 
       // Transform data and add stats
-      const transformedSessions: Session[] =
-        sessionsData?.map((session) => ({
+      const transformedSessions: Session[] = uniqueSessions
+        .map((session) => ({
           id: session.id,
           name: session.name,
           created_at: session.created_at,
@@ -73,12 +118,15 @@ export default function DashboardScreen() {
           order_count: 0,
           total_amount: 0,
           is_creator: session.creator_id === user.id,
-        })) || [];
+        }))
+        .sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
 
       setSessions(transformedSessions);
     } catch (error) {
       console.error("Error fetching sessions:", error);
-      Alert.alert("Error", "Failed to load sessions");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -87,7 +135,6 @@ export default function DashboardScreen() {
 
   const handleCreateSession = async () => {
     if (!sessionName.trim()) {
-      Alert.alert("Error", "Please enter a session name");
       return;
     }
 
@@ -97,6 +144,8 @@ export default function DashboardScreen() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+
+      console.log("Creating session:", sessionName);
 
       const { data, error } = await supabase
         .from("sessions")
@@ -113,11 +162,11 @@ export default function DashboardScreen() {
       await supabase.from("members").insert({
         session_id: data.id,
         user_id: user.id,
-        name: user.user_metadata?.full_name || user.email || "You",
+        name: user.user_metadata?.name || user.phone || "You",
         added_by_user_id: user.id,
       });
 
-      setCreateModalVisible(false);
+      setCreateDialogVisible(false);
       setSessionName("");
       fetchSessions();
 
@@ -125,7 +174,6 @@ export default function DashboardScreen() {
       router.push({ pathname: "/session/[id]", params: { id: data.id } });
     } catch (error) {
       console.error("Error creating session:", error);
-      Alert.alert("Error", "Failed to create session");
     } finally {
       setCreating(false);
     }
@@ -135,130 +183,210 @@ export default function DashboardScreen() {
     router.push({ pathname: "/qr-scanner" });
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      padding: 24,
+      paddingBottom: 16,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: "bold",
+      color: theme.colors.onBackground,
+      marginBottom: 4,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: theme.colors.onSurfaceVariant,
+    },
+    actionContainer: {
+      paddingHorizontal: 24,
+      paddingBottom: 16,
+      flexDirection: "row",
+    },
+    actionButton: {
+      flex: 1,
+      marginHorizontal: 6,
+    },
+    listContainer: {
+      flex: 1,
+      paddingHorizontal: 24,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 32,
+    },
+    emptyTitle: {
+      fontSize: 20,
+      fontWeight: "600",
+      color: theme.colors.onSurfaceVariant,
+      marginTop: 16,
+      textAlign: "center",
+    },
+    emptyDescription: {
+      fontSize: 16,
+      color: theme.colors.onSurfaceVariant,
+      textAlign: "center",
+      marginTop: 8,
+      lineHeight: 24,
+    },
+    sessionCard: {
+      marginBottom: 12,
+      backgroundColor: theme.colors.surface,
+    },
+    cardContent: {
+      paddingVertical: 16,
+    },
+    sessionHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 8,
+    },
+    sessionName: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: theme.colors.onSurface,
+      flex: 1,
+      marginRight: 12,
+    },
+    sessionDate: {
+      fontSize: 14,
+      color: theme.colors.onSurfaceVariant,
+      marginBottom: 12,
+    },
+    sessionStats: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    statItem: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    statText: {
+      fontSize: 14,
+      color: theme.colors.onSurfaceVariant,
+      marginLeft: 4,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    loadingText: {
+      marginTop: 16,
+      fontSize: 16,
+      color: theme.colors.onSurfaceVariant,
+    },
+  });
+
   const renderSessionItem = ({ item }: { item: Session }) => {
     const createdDate = new Date(item.created_at).toLocaleDateString();
 
     return (
-      <TouchableOpacity
+      <Card
+        style={styles.sessionCard}
         onPress={() =>
           router.push({ pathname: "/session/[id]", params: { id: item.id } })
         }
-        className="bg-surface-light dark:bg-surface-dark rounded-xl p-4 mb-3 shadow-sm border border-neutral-200 dark:border-neutral-700"
       >
-        <View className="flex-row justify-between items-start mb-2">
-          <Text className="text-lg font-semibold text-text-light dark:text-text-dark flex-1">
-            {item.name}
-          </Text>
-          {item.is_creator && (
-            <View className="bg-primary-100 dark:bg-primary-900 px-2 py-1 rounded-full">
-              <Text className="text-primary-600 dark:text-primary-400 text-xs font-medium">
+        <Card.Content style={styles.cardContent}>
+          <View style={styles.sessionHeader}>
+            <Text style={styles.sessionName}>{item.name}</Text>
+            {item.is_creator && (
+              <Chip mode="outlined" compact>
                 Creator
+              </Chip>
+            )}
+          </View>
+
+          <Text style={styles.sessionDate}>Created {createdDate}</Text>
+
+          <View style={styles.sessionStats}>
+            <View style={styles.statItem}>
+              <Text style={styles.statText}>
+                {item.member_count || 0} members
               </Text>
             </View>
-          )}
-        </View>
 
-        <View className="flex-row justify-between items-center mb-2">
-          <Text className="text-neutral-600 dark:text-neutral-400 text-sm">
-            Created {createdDate}
-          </Text>
-        </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statText}>
+                {item.order_count || 0} orders
+              </Text>
+            </View>
 
-        <View className="flex-row justify-between">
-          <View className="flex-row items-center">
-            <Ionicons
-              name="people-outline"
-              size={16}
-              color="#6f7c83"
-              className="mr-1"
-            />
-            <Text className="text-neutral-600 dark:text-neutral-400 text-sm mr-4">
-              {item.member_count || 0} members
-            </Text>
+            {item.total_amount && item.total_amount > 0 ? (
+              <Text
+                style={[
+                  styles.statText,
+                  { color: theme.colors.primary, fontWeight: "bold" },
+                ]}
+              >
+                ₱{item.total_amount.toFixed(2)}
+              </Text>
+            ) : null}
           </View>
-
-          <View className="flex-row items-center">
-            <Ionicons
-              name="receipt-outline"
-              size={16}
-              color="#6f7c83"
-              className="mr-1"
-            />
-            <Text className="text-neutral-600 dark:text-neutral-400 text-sm mr-4">
-              {item.order_count || 0} orders
-            </Text>
-          </View>
-
-          {item.total_amount && item.total_amount > 0 && (
-            <Text className="text-primary-600 dark:text-primary-400 font-semibold">
-              ₱{item.total_amount.toFixed(2)}
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
+        </Card.Content>
+      </Card>
     );
   };
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-background-light dark:bg-background-dark">
-        <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#519e8a" />
-          <Text className="text-neutral-600 dark:text-neutral-400 mt-2">
-            Loading sessions...
-          </Text>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Loading sessions...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-background-light dark:bg-background-dark">
+    <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View className="px-6 py-4 border-b border-neutral-200 dark:border-neutral-700">
-        <Text className="text-2xl font-bold text-text-light dark:text-text-dark">
-          Sessions
-        </Text>
-        <Text className="text-neutral-600 dark:text-neutral-400 mt-1">
-          Manage your bill splitting sessions
-        </Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Sessions</Text>
+        <Text style={styles.subtitle}>Manage your bill splitting sessions</Text>
       </View>
 
       {/* Action Buttons */}
-      <View className="px-6 py-4">
-        <View className="flex-row space-x-3">
-          <TouchableOpacity
-            onPress={() => setCreateModalVisible(true)}
-            className="flex-1 bg-primary-500 rounded-xl py-3 flex-row items-center justify-center"
-          >
-            <Ionicons name="add" size={20} color="white" />
-            <Text className="text-white font-semibold ml-2">
-              Create Session
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleJoinSession}
-            className="flex-1 bg-surface-light dark:bg-surface-dark border border-primary-500 rounded-xl py-3 flex-row items-center justify-center"
-          >
-            <Ionicons name="qr-code-outline" size={20} color="#519e8a" />
-            <Text className="text-primary-500 font-semibold ml-2">
-              Join Session
-            </Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.actionContainer}>
+        <Button
+          mode="contained"
+          style={styles.actionButton}
+          onPress={() => setCreateDialogVisible(true)}
+          icon="plus"
+        >
+          Create
+        </Button>
+        <Button
+          mode="outlined"
+          style={styles.actionButton}
+          onPress={handleJoinSession}
+          icon="qrcode"
+        >
+          Join
+        </Button>
       </View>
 
       {/* Sessions List */}
-      <View className="flex-1 px-6">
+      <View style={styles.listContainer}>
         {sessions.length === 0 ? (
-          <View className="flex-1 justify-center items-center">
-            <Ionicons name="list-outline" size={64} color="#9ea8ad" />
-            <Text className="text-xl font-semibold text-neutral-600 dark:text-neutral-400 mt-4">
-              No sessions yet
-            </Text>
-            <Text className="text-neutral-500 dark:text-neutral-500 text-center mt-2">
-              Create your first session or join one with a QR code
+          <View style={styles.emptyContainer}>
+            <Surface style={{ borderRadius: 32, padding: 16 }}>
+              <Text style={{ fontSize: 48, textAlign: "center" }}>📋</Text>
+            </Surface>
+            <Text style={styles.emptyTitle}>No sessions yet</Text>
+            <Text style={styles.emptyDescription}>
+              Create your first session or join one with a QR code to get
+              started with bill splitting.
             </Text>
           </View>
         ) : (
@@ -274,65 +402,45 @@ export default function DashboardScreen() {
                   setRefreshing(true);
                   fetchSessions();
                 }}
-                colors={["#519e8a"]}
+                colors={[theme.colors.primary]}
               />
             }
           />
         )}
       </View>
 
-      {/* Create Session Modal */}
-      <Modal
-        visible={createModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setCreateModalVisible(false)}
-      >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-surface-light dark:bg-surface-dark rounded-t-3xl p-6">
-            <View className="flex-row justify-between items-center mb-6">
-              <Text className="text-xl font-semibold text-text-light dark:text-text-dark">
-                Create New Session
-              </Text>
-              <TouchableOpacity
-                onPress={() => setCreateModalVisible(false)}
-                className="p-2"
-              >
-                <Ionicons name="close" size={24} color="#6f7c83" />
-              </TouchableOpacity>
-            </View>
-
+      {/* Create Session Dialog */}
+      <Portal>
+        <Dialog
+          visible={createDialogVisible}
+          onDismiss={() => setCreateDialogVisible(false)}
+        >
+          <Dialog.Title>Create New Session</Dialog.Title>
+          <Dialog.Content>
             <TextInput
-              placeholder="Enter session name (e.g., Pizza Night)"
+              label="Session Name"
+              placeholder="e.g., Pizza Night, Team Lunch"
               value={sessionName}
               onChangeText={setSessionName}
-              className="bg-neutral-100 dark:bg-neutral-800 text-text-light dark:text-text-dark rounded-xl px-4 py-3 mb-6"
-              placeholderTextColor="#9ea8ad"
+              mode="outlined"
               autoFocus
             />
-
-            <TouchableOpacity
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setCreateDialogVisible(false)}>
+              Cancel
+            </Button>
+            <Button
+              mode="contained"
               onPress={handleCreateSession}
+              loading={creating}
               disabled={creating || !sessionName.trim()}
-              className={`
-                bg-primary-500 rounded-xl py-3 flex-row items-center justify-center
-                ${creating || !sessionName.trim() ? "opacity-50" : ""}
-              `}
             >
-              {creating ? (
-                <ActivityIndicator size="small" color="white" />
-              ) : (
-                <>
-                  <Ionicons name="add" size={20} color="white" />
-                  <Text className="text-white font-semibold ml-2">
-                    Create Session
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+              Create
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </SafeAreaView>
   );
 }
