@@ -48,6 +48,7 @@ export default function RootLayout() {
               <Stack.Screen name="index" />
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="auth/login" />
+              <Stack.Screen name="auth/onboarding" />
               <Stack.Screen name="session/[id]" />
               <Stack.Screen name="profile" />
               <Stack.Screen name="qr-scanner" />

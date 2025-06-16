@@ -66,9 +66,31 @@ export default function IndexScreen() {
   // Redirect based on authentication state
   if (session && session.user) {
     console.log(
-      "IndexScreen: Redirecting to main app for user:",
+      "IndexScreen: Redirecting authenticated user:",
       session.user.id
     );
+
+    // Check if user needs to complete basic onboarding (name only)
+    const userMetadata = session.user.user_metadata || {};
+    const hasName = userMetadata.name && userMetadata.name.trim() !== "";
+    const onboardingCompleted = userMetadata.onboarding_completed === true;
+
+    console.log("IndexScreen: User profile check:", {
+      hasName,
+      onboardingCompleted,
+      metadata: userMetadata,
+    });
+
+    // If user doesn't have a name or hasn't completed onboarding, redirect to onboarding
+    if (!hasName || !onboardingCompleted) {
+      console.log(
+        "IndexScreen: Redirecting to onboarding for profile completion"
+      );
+      return <Redirect href="/auth/onboarding" />;
+    }
+
+    // User has completed their profile, redirect to main app
+    // Note: Users can manage payment methods via the Profile tab
     return <Redirect href="/(tabs)" />;
   }
 

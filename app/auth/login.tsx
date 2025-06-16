@@ -34,7 +34,6 @@ export default function LoginScreen() {
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
-  const [name, setName] = useState("");
   const [countryCode, setCountryCode] = useState<CountryCode>("PH");
   const [callingCode, setCallingCode] = useState<CallingCode>("63");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
@@ -166,9 +165,6 @@ export default function LoginScreen() {
 
       const { data, error } = await supabase.auth.signInWithOtp({
         phone: cleanedPhone,
-        options: {
-          data: name ? { name: name.trim() } : undefined,
-        },
       });
 
       if (error) {
@@ -224,13 +220,13 @@ export default function LoginScreen() {
           // Show success message
           Alert.alert(
             "Welcome! 🎉",
-            "You're now signed in. Taking you to the dashboard...",
+            "You're now signed in. Setting up your account...",
             [{ text: "OK" }]
           );
 
-          // Navigate immediately after successful verification
+          // Let the index.tsx handle the proper navigation (dashboard or onboarding)
           try {
-            router.replace("/(tabs)");
+            router.replace("/");
           } catch (navError) {
             console.error("Navigation error:", navError);
             // Fallback: Force a session refresh to trigger auth listener
@@ -445,22 +441,11 @@ export default function LoginScreen() {
 
   const renderPhoneStep = () => (
     <View style={styles.formContainer}>
-      <Text style={styles.formTitle}>Welcome to Ambagan</Text>
+      <Text style={styles.formTitle}>Welcome!</Text>
       <Text style={styles.formSubtitle}>
-        Enter your phone number to get started. We&apos;ll send you a
-        verification code.
+        Enter your phone number to sign in or create an account. We&apos;ll send
+        you a verification code.
       </Text>
-
-      <TextInput
-        label="Your Name/Nickname"
-        value={name}
-        onChangeText={setName}
-        mode="outlined"
-        style={styles.input}
-        autoCapitalize="words"
-        textContentType="name"
-        placeholder="What should we call you?"
-      />
 
       <View style={styles.phoneInputContainer}>
         <TouchableOpacity onPress={() => setShowCountryPicker(true)}>

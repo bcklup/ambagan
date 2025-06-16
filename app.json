@@ -10,7 +10,11 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.ambagan"
+      "bundleIdentifier": "com.bcklup.ambagan",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to upload your payment QR code screenshot.",
+        "NSCameraUsageDescription": "This app needs access to your camera to take photos of your payment QR code."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +22,12 @@
         "backgroundColor": "#519e8a"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.yourcompany.ambagan"
+      "package": "com.bcklup.ambagan",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",

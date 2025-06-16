@@ -174,3 +174,189 @@ Once phone auth is working:
 4. 📱 **Add contact sync later** (optional enhancement)
 
 International support makes your app ready for global users! 🌍📱✨
+
+# Quick Setup Guide for Ambagan
+
+## 1. Prerequisites
+
+- Node.js 18+ (you're currently on v16.17.1 - consider upgrading)
+- Expo CLI
+- Supabase account
+
+## 2. Initial Setup
+
+### Clone and Install
+
+```bash
+git clone <your-repo>
+cd ambagan
+npm install
+```
+
+### Environment Configuration
+
+Create a `.env` file in the root directory:
+
+```env
+EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+## 3. Database Setup
+
+### Step 1: Run Main Schema
+
+1. Go to your Supabase project dashboard
+2. Navigate to SQL Editor
+3. Copy and paste the contents of `supabase_schema.sql`
+4. Click "Run" to execute
+
+### Step 2: Setup Storage for Image Uploads
+
+1. In the same SQL Editor
+2. Copy and paste the contents of `supabase_storage_setup.sql`
+3. Click "Run" to execute (this creates the bucket)
+
+**Important: Create Storage Policies Manually**
+
+The policies need to be created through the UI due to permission restrictions:
+
+1. Go to **Storage** → **Policies** in your Supabase Dashboard
+2. Click **"Create Policy"** and create these 5 policies for the `user-uploads` bucket:
+
+**Policy 1:** "Users can upload their own files"
+
+- Operation: **INSERT**
+- Policy Definition:
+
+```sql
+(bucket_id = 'user-uploads'::text) AND (auth.uid()::text = (storage.foldername(name))[1])
+```
+
+**Policy 2:** "Users can view their own files"
+
+- Operation: **SELECT**
+- Policy Definition:
+
+```sql
+(bucket_id = 'user-uploads'::text) AND (auth.uid()::text = (storage.foldername(name))[1])
+```
+
+**Policy 3:** "Users can update their own files"
+
+- Operation: **UPDATE**
+- Policy Definition:
+
+```sql
+(bucket_id = 'user-uploads'::text) AND (auth.uid()::text = (storage.foldername(name))[1])
+```
+
+**Policy 4:** "Users can delete their own files"
+
+- Operation: **DELETE**
+- Policy Definition:
+
+```sql
+(bucket_id = 'user-uploads'::text) AND (auth.uid()::text = (storage.foldername(name))[1])
+```
+
+**Policy 5:** "QR codes are publicly viewable"
+
+- Operation: **SELECT**
+- Policy Definition:
+
+```sql
+(bucket_id = 'user-uploads'::text) AND ((storage.foldername(name))[2] = 'payment-qr'::text)
+```
+
+This will create:
+
+- ✅ `user-uploads` storage bucket for QR code images
+- ✅ Proper security policies for file uploads
+- ✅ Public access for payment QR codes
+
+## 4. Authentication Setup
+
+### Enable Phone Authentication
+
+1. In Supabase Dashboard → Authentication → Settings
+2. Enable "Phone" provider
+3. Configure SMS provider (Twilio recommended):
+   - Add your Twilio credentials
+   - Test with a small amount first (~$5)
+
+### Update Site URL (Important!)
+
+1. In Authentication → URL Configuration
+2. Add your development URL:
+   - For Expo Go: `exp://your-local-ip:8081`
+   - For development builds: `your-custom-scheme://`
+
+## 5. Run the App
+
+```bash
+npm start
+```
+
+## 🎯 New Features
+
+### Enhanced Onboarding Flow
+
+- ✅ **Name/Nickname collection** moved to post-signup
+- ✅ **Payment method setup** during onboarding
+- ✅ **InstaPay QR code upload** with image picker
+- ✅ **Alternative payment methods** (cash, manual transfer)
+- ✅ **No skip option** - ensures complete profile setup
+
+### Payment Method Options
+
+1. **InstaPay QR Code**: Upload screenshot from banking app
+2. **Others**: Text field for cash, bank details, GCash, etc.
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+1. **"Safari can't connect to server"**: Update site URL in Supabase
+2. **Image upload fails**: Check storage bucket creation
+3. **Phone auth not working**: Verify SMS provider setup
+4. **Navigation issues**: Clear Expo cache: `expo r -c`
+
+### Storage Issues
+
+- **"must be owner of table objects" error**: This is normal - create storage policies manually through the Dashboard UI (see Step 2 above)
+- Ensure `user-uploads` bucket exists in Supabase Storage
+- Check RLS policies are properly configured through the UI
+- Verify image MIME types are allowed (JPEG, PNG, WebP, GIF)
+- Test file upload with a small image first
+
+## 📱 User Flow
+
+1. **Login**: Phone + OTP authentication
+2. **New Users**: Automatic redirect to onboarding
+3. **Onboarding**: Name + Payment method setup
+4. **Existing Users**: Direct access to dashboard
+
+## 🎨 UI/UX Features
+
+- ✅ Material Design 3 components
+- ✅ Custom brand colors (#519e8a primary)
+- ✅ Dark/Light theme support
+- ✅ Responsive layout for all screen sizes
+- ✅ Accessible design patterns
+
+## 📊 Database Structure
+
+The app uses these main tables:
+
+- `sessions` - Bill splitting sessions
+- `members` - Session participants
+- `orders` - Items to be split
+- `user_payment_methods` - Payment preferences
+- `order_payers` & `order_consumers` - Payment relationships
+
+All tables have proper RLS policies for security.
+
+---
+
+Need help? Check the detailed `SETUP.md` or the inline code comments!
