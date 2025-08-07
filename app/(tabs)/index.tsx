@@ -109,20 +109,50 @@ export default function DashboardScreen() {
       console.log("Dashboard: Fetched sessions:", uniqueSessions.length);
 
       // Transform data and add stats
-      const transformedSessions: Session[] = uniqueSessions
-        .map((session) => ({
+      const transformedSessions: Session[] = [];
+
+      for (const session of uniqueSessions) {
+        // Get member count for this session
+        const { data: memberData, error: memberError } = await supabase
+          .from("members")
+          .select("id")
+          .eq("session_id", session.id);
+
+        if (memberError) {
+          console.error("Error fetching member count:", memberError);
+        }
+
+        // Get order count and total amount for this session
+        const { data: orderData, error: orderError } = await supabase
+          .from("orders")
+          .select("id, total_amount")
+          .eq("session_id", session.id);
+
+        if (orderError) {
+          console.error("Error fetching order data:", orderError);
+        }
+
+        const member_count = memberData?.length || 0;
+        const order_count = orderData?.length || 0;
+        const total_amount =
+          orderData?.reduce((sum, order) => sum + order.total_amount, 0) || 0;
+
+        transformedSessions.push({
           id: session.id,
           name: session.name,
           created_at: session.created_at,
-          member_count: 0, // Will be populated by real stats
-          order_count: 0,
-          total_amount: 0,
+          member_count,
+          order_count,
+          total_amount,
           is_creator: session.creator_id === user.id,
-        }))
-        .sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
+        });
+      }
+
+      // Sort by creation date
+      transformedSessions.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
 
       setSessions(transformedSessions);
     } catch (error) {
@@ -158,11 +188,21 @@ export default function DashboardScreen() {
 
       if (error) throw error;
 
-      // Add creator as a member
+      // Add creator as a member with proper name
+      const userName = user.user_metadata?.name;
+      const userPhone = user.phone;
+
+      let memberName = "You";
+      if (userName) {
+        memberName = userName;
+      } else if (userPhone) {
+        memberName = userPhone;
+      }
+
       await supabase.from("members").insert({
         session_id: data.id,
         user_id: user.id,
-        name: user.user_metadata?.name || user.phone || "You",
+        name: memberName,
         added_by_user_id: user.id,
       });
 
@@ -210,6 +250,7 @@ export default function DashboardScreen() {
     actionButton: {
       flex: 1,
       marginHorizontal: 6,
+      paddingHorizontal: 5,
     },
     listContainer: {
       flex: 1,

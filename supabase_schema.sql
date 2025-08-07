@@ -319,7 +319,7 @@ BEGIN
     balance_calculation AS (
         SELECT 
             payer.member_id as payer_member_id,
-            payer_member.name as payer_name,
+            payer_member.name::TEXT as payer_name,
             consumer.order_id,
             consumer.order_name,
             consumer.member_share,

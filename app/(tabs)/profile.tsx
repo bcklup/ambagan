@@ -570,6 +570,7 @@ export default function ProfileScreen() {
     },
     viewQrButton: {
       marginLeft: 8,
+      paddingHorizontal: 5,
     },
     errorText: {
       color: theme.colors.error,
