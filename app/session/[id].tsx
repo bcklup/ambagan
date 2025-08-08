@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { AppTheme } from "@/lib/theme";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -134,6 +134,7 @@ export default function SessionScreen() {
   const [saving, setSaving] = useState(false);
 
   const calculateBalances = async () => {
+    console.log("💰 calculateBalances called at:", new Date().toISOString());
     if (!session || !members.length) return;
 
     try {
@@ -240,23 +241,51 @@ export default function SessionScreen() {
     fetchSessionData();
   }, [id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      // Refresh data when screen comes into focus
-      // This will trigger when returning from assign-split screen
-      if (id && !loading) {
-        fetchSessionData();
-      }
-    }, [id, loading])
-  );
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     // Refresh data when screen comes into focus
+  //     // This will trigger when returning from assign-split screen
+  //     if (id && !loading) {
+  //       fetchSessionData();
+  //     }
+  //   }, [id, loading])
+  // );
 
   useEffect(() => {
-    if (activeTab === "balances" && members.length > 0 && orders.length > 0) {
-      calculateBalances();
+    // Only calculate balances when switching to balances tab and we have actual data
+    // Add a small delay to prevent rapid recalculations during data loading
+    if (
+      activeTab === "balances" &&
+      members.length > 0 &&
+      orders.length > 0 &&
+      !loading
+    ) {
+      console.log("🧮 Calculating balances...");
+      const timeoutId = setTimeout(() => {
+        calculateBalances();
+      }, 200);
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [activeTab, members, orders, orderPayers, orderConsumers]);
+  }, [
+    activeTab,
+    members.length,
+    orders.length,
+    orderPayers.length,
+    orderConsumers.length,
+    loading,
+  ]);
 
   const fetchSessionData = async () => {
+    console.log("🔄 fetchSessionData called at:", new Date().toISOString());
+    console.log(
+      "📊 Current state - loading:",
+      loading,
+      "refreshing:",
+      refreshing,
+      "id:",
+      id
+    );
     try {
       const {
         data: { user },
@@ -348,9 +377,12 @@ export default function SessionScreen() {
   };
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchSessionData();
-  }, []);
+    console.log("🔄 onRefresh called");
+    if (!refreshing) {
+      setRefreshing(true);
+      fetchSessionData();
+    }
+  }, [refreshing]);
 
   const handleAddMember = async () => {
     if (!memberName.trim() || !currentUser || !session) return;
@@ -464,6 +496,57 @@ export default function SessionScreen() {
 
   const isCreator =
     currentUser && session && session.creator_id === currentUser.id;
+
+  const handleDeleteSession = async () => {
+    if (!session || !isCreator) return;
+
+    Alert.alert(
+      "Delete Session",
+      `Are you sure you want to delete "${session.name}"? This action cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+
+              // Delete the session (this will cascade delete all related data)
+              const { error } = await supabase
+                .from("sessions")
+                .delete()
+                .eq("id", session.id);
+
+              if (error) {
+                console.error("Error deleting session:", error);
+                Alert.alert(
+                  "Error",
+                  "Failed to delete session. Please try again."
+                );
+                setLoading(false);
+                return;
+              }
+
+              Alert.alert("Success", "Session deleted successfully", [
+                {
+                  text: "OK",
+                  onPress: () => router.replace("/(tabs)"),
+                },
+              ]);
+            } catch (error) {
+              console.error("Unexpected error:", error);
+              Alert.alert(
+                "Error",
+                "Failed to delete session. Please try again."
+              );
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const renderMemberItem = ({ item }: { item: Member }) => (
     <Card style={styles.listItem}>
@@ -1249,14 +1332,25 @@ export default function SessionScreen() {
             leadingIcon="qrcode"
           />
           {isCreator && (
-            <Menu.Item
-              onPress={() => {
-                setMenuVisible(false);
-                // TODO: Edit session
-              }}
-              title="Edit Session"
-              leadingIcon="pencil"
-            />
+            <>
+              <Menu.Item
+                onPress={() => {
+                  setMenuVisible(false);
+                  // TODO: Edit session
+                }}
+                title="Edit Session"
+                leadingIcon="pencil"
+              />
+              <Menu.Item
+                onPress={() => {
+                  setMenuVisible(false);
+                  handleDeleteSession();
+                }}
+                title="Delete Session"
+                leadingIcon="delete"
+                titleStyle={{ color: theme.colors.error }}
+              />
+            </>
           )}
         </Menu>
       </Appbar.Header>

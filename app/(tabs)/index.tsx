@@ -42,6 +42,10 @@ export default function DashboardScreen() {
   }, []);
 
   const fetchSessions = async () => {
+    console.log(
+      "📱 Dashboard fetchSessions called at:",
+      new Date().toISOString()
+    );
     try {
       const {
         data: { user },

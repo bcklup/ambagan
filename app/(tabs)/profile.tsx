@@ -8,13 +8,13 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Image,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
 } from "react-native";
-import ImageViewing from "react-native-image-viewing";
 import {
   ActivityIndicator,
   Avatar,
@@ -892,49 +892,63 @@ export default function ProfileScreen() {
         </Modal>
 
         {/* View QR Code Modal */}
-        <ImageViewing
-          images={
-            paymentMethod?.qr_image_url
-              ? [{ uri: paymentMethod.qr_image_url }]
-              : []
-          }
-          imageIndex={0}
+        <Modal
           visible={viewQrModal}
-          onRequestClose={() => setViewQrModal(false)}
-          HeaderComponent={() => (
-            <View
+          onDismiss={() => setViewQrModal(false)}
+          contentContainerStyle={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.9)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              position: "absolute",
+              top: Platform.OS === "web" ? 20 : 50,
+              left: 0,
+              right: 0,
+              zIndex: 1,
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              paddingHorizontal: 20,
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+            }}
+          >
+            <Text
               style={{
-                position: "absolute",
-                top: 50,
-                left: 0,
-                right: 0,
-                zIndex: 1,
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                paddingHorizontal: 20,
-                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                color: "white",
+                fontSize: 18,
+                fontWeight: "600",
               }}
             >
-              <Text
-                style={{
-                  color: "white",
-                  fontSize: 18,
-                  fontWeight: "600",
-                }}
-              >
-                Payment Details
-              </Text>
-              <IconButton
-                icon="close"
-                size={28}
-                iconColor="white"
-                onPress={() => setViewQrModal(false)}
-                style={{ backgroundColor: "rgba(255, 255, 255, 0.2)" }}
-              />
-            </View>
+              Payment QR Code
+            </Text>
+            <IconButton
+              icon="close"
+              size={28}
+              iconColor="white"
+              onPress={() => setViewQrModal(false)}
+              style={{ backgroundColor: "rgba(255, 255, 255, 0.2)" }}
+            />
+          </View>
+          {paymentMethod?.qr_image_url && (
+            <Image
+              source={{ uri: paymentMethod.qr_image_url }}
+              style={{
+                width: Platform.OS === "web" ? "80%" : "90%",
+                height: Platform.OS === "web" ? "80%" : "70%",
+                resizeMode: "contain",
+              }}
+              onError={(error) => {
+                console.log("QR image load error:", error);
+                Alert.alert("Error", "Failed to load QR code image");
+                setViewQrModal(false);
+              }}
+            />
           )}
-        />
+        </Modal>
       </Portal>
     </SafeAreaView>
   );

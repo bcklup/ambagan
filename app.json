@@ -51,8 +51,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "your-project-id-here"
-      }
-    }
+        "projectId": "4299d373-b28a-4d08-8857-272a710d707c"
+      },
+      "router": {}
+    },
+    "owner": "bcklup"
   }
 }
