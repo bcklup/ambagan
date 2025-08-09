@@ -12,7 +12,6 @@ import {
   Text,
   useTheme,
 } from "react-native-paper";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function QRScannerScreen() {
   const router = useRouter();
@@ -205,7 +204,7 @@ export default function QRScannerScreen() {
   if (!permission) {
     // Camera permissions are still loading
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <Appbar.Header>
           <Appbar.BackAction onPress={() => router.back()} />
           <Appbar.Content title="Join Session" />
@@ -213,14 +212,14 @@ export default function QRScannerScreen() {
         <View style={styles.permissionContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!permission.granted) {
     // Camera permissions are not granted yet
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <Appbar.Header>
           <Appbar.BackAction onPress={() => router.back()} />
           <Appbar.Content title="Join Session" />
@@ -241,7 +240,7 @@ export default function QRScannerScreen() {
             Grant Camera Permission
           </Button>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 

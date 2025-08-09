@@ -341,16 +341,31 @@ export default function AssignSplitScreen() {
   };
 
   const distributeEqualSplit = () => {
-    const selectedCount = consumers.filter((c) => c.checked).length;
-    if (selectedCount === 0 || !order) return;
+    if (!order || consumers.length === 0) return;
 
-    const amountPerPerson = (order.total_amount / selectedCount).toFixed(2);
+    // For equal split, include all members (check them all and distribute equally)
+    const totalAmountCents = Math.round(order.total_amount * 100); // Work in cents to avoid floating point issues
+    const memberCount = consumers.length;
+
+    // Calculate base amount per person in cents
+    const baseAmountCents = Math.floor(totalAmountCents / memberCount);
+
+    // Calculate remainder cents that need to be distributed
+    const remainderCents = totalAmountCents - baseAmountCents * memberCount;
 
     setConsumers((prev) =>
-      prev.map((c) => ({
-        ...c,
-        split_amount: c.checked ? amountPerPerson : c.split_amount,
-      }))
+      prev.map((c, index) => {
+        // Add 1 extra cent to the first 'remainderCents' members
+        const extraCent = index < remainderCents ? 1 : 0;
+        const finalAmountCents = baseAmountCents + extraCent;
+        const finalAmount = finalAmountCents / 100; // Convert back to dollars
+
+        return {
+          ...c,
+          checked: true, // Auto-check all members for equal split
+          split_amount: finalAmount.toFixed(2),
+        };
+      })
     );
   };
 

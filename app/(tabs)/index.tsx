@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { AppTheme } from "@/lib/theme";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
@@ -40,6 +40,17 @@ export default function DashboardScreen() {
   useEffect(() => {
     fetchSessions();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Refresh sessions when screen comes into focus
+      // This will trigger when returning from session details
+      if (!loading) {
+        console.log("🏠 Dashboard focused, refreshing sessions...");
+        fetchSessions();
+      }
+    }, [loading])
+  );
 
   const fetchSessions = async () => {
     console.log(

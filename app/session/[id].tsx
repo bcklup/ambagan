@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { AppTheme } from "@/lib/theme";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -241,15 +241,16 @@ export default function SessionScreen() {
     fetchSessionData();
   }, [id]);
 
-  // useFocusEffect(
-  //   useCallback(() => {
-  //     // Refresh data when screen comes into focus
-  //     // This will trigger when returning from assign-split screen
-  //     if (id && !loading) {
-  //       fetchSessionData();
-  //     }
-  //   }, [id, loading])
-  // );
+  useFocusEffect(
+    useCallback(() => {
+      // Refresh data when screen comes into focus
+      // This will trigger when returning from assign-split screen
+      if (id && !loading) {
+        console.log("🔄 Screen focused, refreshing data...");
+        fetchSessionData();
+      }
+    }, [id, loading])
+  );
 
   useEffect(() => {
     // Only calculate balances when switching to balances tab and we have actual data
@@ -385,13 +386,17 @@ export default function SessionScreen() {
   }, [refreshing]);
 
   const handleAddMember = async () => {
-    if (!memberName.trim() || !currentUser || !session) return;
+    if (!memberName.trim()) return;
 
     try {
       setSaving(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || !session) return;
 
       if (editingMemberId) {
-        // Edit existing member
+        // Update existing member
         const { error } = await supabase
           .from("members")
           .update({ name: memberName.trim() })
@@ -402,9 +407,11 @@ export default function SessionScreen() {
         // Add new member
         const { error } = await supabase.from("members").insert({
           session_id: session.id,
-          user_id: null, // Manual entry, not linked to app user
           name: memberName.trim(),
-          added_by_user_id: currentUser.id,
+          user_id: null, // Manual entry
+          payment_method_type: "other",
+          payment_notes: "Cash or other payment method",
+          added_by_user_id: user.id,
         });
 
         if (error) throw error;
@@ -413,13 +420,10 @@ export default function SessionScreen() {
       setMemberDialogVisible(false);
       setMemberName("");
       setEditingMemberId(null);
-      fetchSessionData();
+      fetchSessionData(); // Refresh data
     } catch (error) {
       console.error("Error saving member:", error);
-      Alert.alert(
-        "Error",
-        editingMemberId ? "Failed to update member" : "Failed to add member"
-      );
+      Alert.alert("Error", "Failed to save member");
     } finally {
       setSaving(false);
     }
@@ -431,9 +435,69 @@ export default function SessionScreen() {
     setMemberDialogVisible(true);
   };
 
+  const handleAssignSplit = (orderId: string) => {
+    if (!session?.id) return;
+
+    router.push({
+      pathname: "/session/[id]/assign-split",
+      params: { id: session.id, orderId },
+    });
+  };
+
+  const handleDeleteMember = async (memberId: string) => {
+    Alert.alert(
+      "Delete Member",
+      "Are you sure you want to remove this member?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from("members")
+                .delete()
+                .eq("id", memberId);
+
+              if (error) throw error;
+              fetchSessionData();
+            } catch (error) {
+              console.error("Error deleting member:", error);
+              Alert.alert("Error", "Failed to delete member");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    Alert.alert("Delete Order", "Are you sure you want to delete this order?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const { error } = await supabase
+              .from("orders")
+              .delete()
+              .eq("id", orderId);
+
+            if (error) throw error;
+            fetchSessionData();
+          } catch (error) {
+            console.error("Error deleting order:", error);
+            Alert.alert("Error", "Failed to delete order");
+          }
+        },
+      },
+    ]);
+  };
+
   const handleAddOrder = async () => {
-    if (!orderName.trim() || !orderAmount.trim() || !currentUser || !session)
-      return;
+    if (!orderName.trim() || !orderAmount.trim()) return;
 
     const amount = parseFloat(orderAmount);
     if (isNaN(amount) || amount <= 0) {
@@ -443,9 +507,13 @@ export default function SessionScreen() {
 
     try {
       setSaving(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || !session) return;
 
       if (editingOrderId) {
-        // Edit existing order
+        // Update existing order
         const { error } = await supabase
           .from("orders")
           .update({
@@ -463,7 +531,7 @@ export default function SessionScreen() {
           name: orderName.trim(),
           description: orderDescription.trim() || null,
           total_amount: amount,
-          created_by_user_id: currentUser.id,
+          created_by_user_id: user.id,
         });
 
         if (error) throw error;
@@ -474,13 +542,10 @@ export default function SessionScreen() {
       setOrderDescription("");
       setOrderAmount("");
       setEditingOrderId(null);
-      fetchSessionData();
+      fetchSessionData(); // Refresh data
     } catch (error) {
       console.error("Error saving order:", error);
-      Alert.alert(
-        "Error",
-        editingOrderId ? "Failed to update order" : "Failed to add order"
-      );
+      Alert.alert("Error", "Failed to save order");
     } finally {
       setSaving(false);
     }
@@ -616,6 +681,7 @@ export default function SessionScreen() {
                       marginLeft: 8,
                       backgroundColor: theme.colors.primaryContainer,
                     }}
+                    textStyle={{ fontSize: 12 }}
                   >
                     Split Assigned
                   </Chip>
@@ -645,7 +711,11 @@ export default function SessionScreen() {
             <View style={{ alignItems: "flex-end" }}>
               <Text
                 variant="titleLarge"
-                style={{ color: theme.colors.primary, fontWeight: "bold" }}
+                style={{
+                  color: theme.colors.primary,
+                  fontWeight: "bold",
+                  fontSize: 18,
+                }}
               >
                 ₱{item.total_amount.toFixed(2)}
               </Text>
@@ -701,7 +771,7 @@ export default function SessionScreen() {
                 Split among ({consumers.length})
               </Text>
               {consumers.length > 0 ? (
-                consumers.map((consumer) => (
+                consumers.splice(0, 3).map((consumer) => (
                   <Text key={consumer.id} variant="bodySmall">
                     {consumer.member_name} ({consumer.split_ratio}x)
                   </Text>
@@ -717,6 +787,7 @@ export default function SessionScreen() {
                   No consumers assigned
                 </Text>
               )}
+              {consumers.length >= 3 && <Text variant="bodySmall">...</Text>}
             </View>
           </View>
 
@@ -737,65 +808,26 @@ export default function SessionScreen() {
     );
   };
 
-  const handleDeleteMember = async (memberId: string) => {
-    Alert.alert(
-      "Delete Member",
-      "Are you sure you want to remove this member?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from("members")
-                .delete()
-                .eq("id", memberId);
-
-              if (error) throw error;
-              fetchSessionData();
-            } catch (error) {
-              console.error("Error deleting member:", error);
-              Alert.alert("Error", "Failed to delete member");
-            }
-          },
-        },
-      ]
-    );
+  const getFABIcon = () => {
+    switch (activeTab) {
+      case "members":
+        return "account-plus";
+      case "orders":
+        return "plus";
+      default:
+        return "plus";
+    }
   };
 
-  const handleDeleteOrder = async (orderId: string) => {
-    Alert.alert("Delete Order", "Are you sure you want to delete this order?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const { error } = await supabase
-              .from("orders")
-              .delete()
-              .eq("id", orderId);
-
-            if (error) throw error;
-            fetchSessionData();
-          } catch (error) {
-            console.error("Error deleting order:", error);
-            Alert.alert("Error", "Failed to delete order");
-          }
-        },
-      },
-    ]);
-  };
-
-  const handleAssignSplit = (orderId: string) => {
-    if (!session?.id) return;
-
-    router.push({
-      pathname: "/session/[id]/assign-split",
-      params: { id: session.id, orderId },
-    });
+  const getFABAction = () => {
+    switch (activeTab) {
+      case "members":
+        return () => setMemberDialogVisible(true);
+      case "orders":
+        return () => setOrderDialogVisible(true);
+      default:
+        return undefined;
+    }
   };
 
   const renderContent = () => {
@@ -935,9 +967,9 @@ export default function SessionScreen() {
                               style={{ color: theme.colors.onSurfaceVariant }}
                             >
                               {netBalance > 0
-                                ? "Should receive"
+                                ? "Receives"
                                 : netBalance < 0
-                                ? "Should pay"
+                                ? "Owes"
                                 : "Even"}
                             </Text>
                             <Text
@@ -960,7 +992,7 @@ export default function SessionScreen() {
 
                         {/* Show specific payments this member needs to make */}
                         {memberBalance.balances.length > 0 && (
-                          <View style={{ marginTop: 16 }}>
+                          <View>
                             <Text
                               variant="titleSmall"
                               style={{
@@ -1035,7 +1067,7 @@ export default function SessionScreen() {
                         {/* Show if this member should receive money */}
                         {memberBalance.total_owed_to_them > 0 &&
                           memberBalance.balances.length === 0 && (
-                            <View style={{ marginTop: 16 }}>
+                            <View>
                               <Text
                                 variant="titleSmall"
                                 style={{
@@ -1199,38 +1231,6 @@ export default function SessionScreen() {
 
       default:
         return null;
-    }
-  };
-
-  const getFABAction = () => {
-    switch (activeTab) {
-      case "members":
-        return () => {
-          setMemberName("");
-          setEditingMemberId(null);
-          setMemberDialogVisible(true);
-        };
-      case "orders":
-        return () => {
-          setOrderName("");
-          setOrderDescription("");
-          setOrderAmount("");
-          setEditingOrderId(null);
-          setOrderDialogVisible(true);
-        };
-      default:
-        return undefined;
-    }
-  };
-
-  const getFABIcon = () => {
-    switch (activeTab) {
-      case "members":
-        return "account-plus";
-      case "orders":
-        return "plus";
-      default:
-        return "plus";
     }
   };
 
